@@ -1,0 +1,94 @@
+'BOUNCY by @KevinSavetz
+'with massive math help from @pneumaticdeath's math skills
+'Jan 7 2019, for the 2019 BASIC 10-line contest
+
+W=1:'W is "did we win?" if yes (or 1st time) change goal position
+XMAX=159:'GR 7
+YMAX=92:'95 for full GR.7 screen, we lose a little because text line at top
+
+DO
+	GRAPHICS 7+16
+	DL=DPEEK(741):'location of display list
+	POKE DL+4,66:'change top line to Graphics 0 text line (ANNTIC mode 2)
+	-MOVE DL+102,DL+99,3:'shorten the display list so screen's not too tall
+	'POKE DL+99,PEEK(DL+102):DPOKE DL+100,DPEEK(DL+103):'another way to do it
+	POKE 752,1:'hide cursor
+
+	IF W:'if player just won (or first time), place goal in new random position
+		CX=RAND(XMAX-30)+20:'goal x
+		CY=RAND(YMAX-15)+15:'goal y
+		CW=10:'goal width
+		W=0
+	ENDIF
+	COLOR 1
+	PLOT CX,CY:DRAWTO CX+CW,CY:'draw goal
+
+	POKE 87,0:POS.0,0:'draw control interface on the GR.0 part
+	?"BOUNCY  ANGLE: 10  SPEED: 10  AIM "
+
+	WHILE STRIG(0):'joystick to adjust andle and speed. Trigger to fire.
+		S=STICK(0)
+		AI=AI+((S=14)-(S=13))*5:'up/down to adjust angle
+		VI=VI+((S=7)-(S=11))*5:'left/right to adjust velocity
+		IF AI<10:AI=10:ENDIF:'keep angle and velocity in range
+		IF AI>60:AI=60:ENDIF
+		IF VI<10:VI=10:ENDIF
+		IF VI>50:VI=50:ENDIF
+		POS.15,0:?AI;" "
+		POS.26,0:?VI;" "
+		PAUSE 10
+	WEND
+	POS.30,0:?"    ":'erase AIM
+	POKE 87,7:'get ready to draw in the GR.7 part
+	POKE 77,0:'defeat attract mode
+
+	'launch ball!
+	COLOR 2
+	T=0:'TIME COUNTER
+	LB=0:'LAST BOUNCE TIME
+	DT=.03:'TIME INCREMENT
+	X=1:'INITIAL X
+	Y=10:'INITIAL Y
+	G=12:'GRAVITY
+	E=.6:'ELASTICITY
+	A=AI*.01745:'CONVERT DEGREES TO RADIANS. .01745 IS (3.14159/180)
+	VX=VI*COS(A):'X VELOCITY
+	VY=VI*SIN(-1*A):'Y VELOCITY
+
+	DO:'move/bounce ball
+		T=T+DT:'time passes...
+		X=X+VX*DT:'increment X
+		Y=Y+VY*DT:'increment Y
+		VY=VY+G*DT:'change velocity
+		IF Y>YMAX:'BALL HIT BOTTOM. CHANGE TRAJECTORY TO BOUNCE IT
+			VY=VY*-E:'adjust speed for bounce
+			DY=Y-YMAX:'switch to upwards movement
+			Y=YMAX-DY*E
+			IF X>=XMAX OR T-LB<1.5:'TINY BOUNCING AT THE END, QUIT
+				EXIT
+			ENDIF
+			LB=T:'LB=TIME OF LAST BOUNCE
+			FOR I=250 TO 50 STEP -6:SO.0,I,10,10:NEXT I:SOUND:'BOUNCE SOUND
+		ENDIF
+
+		IF X<XMAX AND Y>1:'We already know Y<YMAX because IF above
+			PLOT X,Y:'draw ball if it's onscreen
+
+			'Set win flag if ball hit the goal while falling
+			IF X>=CX AND X<=CX+CW AND VY>0 AND (INT(Y)=CY OR INT(Y)=CY-1)
+				W=1
+				EXIT
+			ENDIF
+		ENDIF
+	LOOP
+
+	POKE 87,0:POS.30,0:'print win or lose status
+	IF W
+		?"WIN!"
+	ELSE
+		?"MISS"
+	ENDIF
+	FOR I=0 TO 15:SOUND 0,50*(3*(NOT W))+50,10,15-I:NEXT I:'DING FOR WIN, BOOP FOR MISS
+	POKE 87,7:'back to playing in GR.7 area
+	PAUSE 200
+LOOP
